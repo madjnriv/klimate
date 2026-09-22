@@ -11,18 +11,27 @@ import {
   CommandSeparator,
 } from "./ui/command";
 import { format } from "date-fns";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLocationSearch } from "@/hooks/useWeather";
 import { useSearchHistory } from "@/hooks/useSearchHistory";
 import { useFavorites } from "@/hooks/useFavorite";
+import { useDebounce } from "@/hooks/useDebounce";
+import { useKeyboardNavigation } from "@/hooks/useKeyboardNavigation";
+import { cn } from "@/lib/utils";
+import { Alert, AlertDescription } from "./ui/alert";
 
 const CitySearch = () => {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const navigate = useNavigate();
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const { data: locations, isLoading } = useLocationSearch(query);
+  const debouncedQuery = useDebounce(query);
+  const trimmedQuery = query.trim();
+  const hasSearchQuery = trimmedQuery.length >= 3;
+
+  const { data: locations, isLoading, error } = useLocationSearch(debouncedQuery);
   const { favorites } = useFavorites();
   const { history, clearHistory, addToHistory } = useSearchHistory();
 
@@ -41,6 +50,16 @@ const CitySearch = () => {
     setOpen(false);
     navigate(`/city/${name}?lat=${lat}&lon=${lon}`);
   };
+
+  // use keyboard Navigation
+  const { selectedIndex, handleKeyDown, resetSelection } =
+    useKeyboardNavigation({
+      results: locations,
+      isOpen: open,
+      onSelect: handleSelect,
+      onClose: () => setOpen(false),
+    });
+
   return (
     <>
       <Button
@@ -57,10 +76,20 @@ const CitySearch = () => {
             placeholder="Search cities..."
             value={query}
             onValueChange={setQuery}
+            ref={inputRef}
+            onKeyDown={handleKeyDown}
           />
           <CommandList>
-            {query.length > 2 && !isLoading && (
+            {hasSearchQuery && !isLoading && !error && (
               <CommandEmpty>No cities found.</CommandEmpty>
+            )}
+
+            {error && (
+              <Alert variant="destructive" className="m-2">
+                <AlertDescription>
+                  We couldn’t fetch city suggestions right now. Please try again.
+                </AlertDescription>
+              </Alert>
             )}
 
             {/* Favorites Section */}
@@ -130,20 +159,30 @@ const CitySearch = () => {
               </>
             )}
 
+            {/* Loading State */}
+            {isLoading && (
+              <div className="flex items-center justify-center gap-2 py-6 text-sm text-gray-400">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Searching...</span>
+              </div>
+            )}
+
             {/* Search Results */}
-            <CommandSeparator />
-            {locations && locations.length > 0 && (
+            {hasSearchQuery && <CommandSeparator />}
+            {hasSearchQuery && locations && locations.length > 0 && (
               <CommandGroup heading="Suggestions">
                 {isLoading && (
                   <div className="flex items-center justify-center p-4">
                     <Loader2 className="h-4 w-4 animate-spin" />
                   </div>
                 )}
-                {locations?.map((location) => (
+                {locations?.map((location, index) => (
                   <CommandItem
                     key={`${location.lat}-${location.lon}`}
                     value={`${location.lat}|${location.lon}|${location.name}|${location.country}`}
                     onSelect={handleSelect}
+                    className={cn(selectedIndex === index && "bg-accent")}
+                    onMouseEnter={() => resetSelection(index)}
                   >
                     <Search className="mr-2 h-4 w-4" />
                     <span>{location.name}</span>

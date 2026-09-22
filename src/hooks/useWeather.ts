@@ -36,9 +36,13 @@ export function useReverseGeocodeQuery(coordinates: Coordinates | null) {
 }
 
 export function useLocationSearch(query: string) {
+  const trimmedQuery = query.trim();
+
   return useQuery({
-    queryKey: WEATHER_KEYS.search(query),
-    queryFn: () => weatherAPI.searchLocations(query),
-    enabled: query.length >= 3,
+    queryKey: WEATHER_KEYS.search(trimmedQuery),
+    queryFn: ({ signal }) => weatherAPI.searchLocations(trimmedQuery, signal),
+    enabled: trimmedQuery.length >= 3,
+    staleTime: 30_000,
+    retry: false,
   });
 }
