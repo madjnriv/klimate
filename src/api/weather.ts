@@ -15,8 +15,8 @@ class WeatherAPI {
     return `${endpoint}?${searchParams.toString()}`;
   }
 
-  private async fetchData<T>(url: string): Promise<T> {
-    const response = await fetch(url);
+  private async fetchData<T>(url: string, signal?: AbortSignal): Promise<T> {
+    const response = await fetch(url, signal ? { signal } : undefined);
 
     if (!response.ok) {
       throw new Error(`Weather API Error: ${response.statusText}`);
@@ -57,12 +57,21 @@ class WeatherAPI {
     return this.fetchData<GeocodingResponse[]>(url);
   }
 
-  async searchLocations(query: string): Promise<GeocodingResponse[]> {
+  async searchLocations(
+    query: string,
+    signal?: AbortSignal,
+  ): Promise<GeocodingResponse[]> {
+    const trimmedQuery = query.trim();
+
+    if (!trimmedQuery) {
+      return [];
+    }
+
     const url = this.createUrl(`${API_CONFIG.GEO}/direct`, {
-      q: query,
+      q: trimmedQuery,
       limit: "5",
     });
-    return this.fetchData<GeocodingResponse[]>(url);
+    return this.fetchData<GeocodingResponse[]>(url, signal);
   }
 }
 
